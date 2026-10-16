@@ -90,6 +90,15 @@ export class ChiaveHelloMancanteError extends Error {
   }
 }
 
+export class FirmaNonValidaError extends Error {
+  constructor(
+    message = "Il file delle credenziali Aruba non è firmato o è stato modificato: per sicurezza non viene usato. Reinserisci le credenziali.",
+  ) {
+    super(message);
+    this.name = "FirmaNonValidaError";
+  }
+}
+
 export class VaultIllegibileError extends Error {
   constructor(dettaglio?: string) {
     super(

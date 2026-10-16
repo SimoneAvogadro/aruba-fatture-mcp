@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as attendi } from "node:timers/promises";
@@ -46,6 +47,14 @@ function chiaveFinta({ esiste = true } = {}) {
       if (passo.errore) throw passo.errore;
       return xor(dati);
     },
+    firme: 0,
+    async firma(dati) {
+      this.firme++;
+      return createHash("sha256").update("segreto").update(dati).digest();
+    },
+    async verificaFirma(dati, firma) {
+      return createHash("sha256").update("segreto").update(dati).digest().equals(firma);
+    },
     async elimina() {
       return true;
     },
@@ -67,6 +76,7 @@ async function prepara({ conVault = true, esiti = [], risposte = [], chiave = ch
   if (conVault) {
     await salvaCredenziali(percorso, salvate, chiave);
     chiave.cifrature = 0;
+    chiave.firme = 0;
   }
   const finestra = finestraFinta(risposte);
   const verifiche = [];
@@ -235,4 +245,18 @@ test("il suggerimento per i rifiuti non è vuoto e non contiene la password", as
   await fornitore.ottieni();
   assert.ok(fornitore.suggerimentoRifiuto.trim().length > 0);
   assert.equal(fornitore.suggerimentoRifiuto.includes(salvate.password), false);
+});
+
+test("file non firmato o modificato: non chiede Hello per decifrare, richiede le credenziali e risalva firmando", async () => {
+  const { fornitore, chiave, finestra, percorso } = await prepara({ risposte: [nuove] });
+  const contenuto = JSON.parse(await readFile(percorso, "utf8"));
+  const dati = Buffer.from(contenuto.dati, "base64");
+  dati[0] ^= 1;
+  await writeFile(percorso, JSON.stringify({ ...contenuto, dati: dati.toString("base64") }));
+
+  assert.deepEqual(await fornitore.ottieni(), nuove);
+  assert.equal(chiave.decifrature, 0);
+  assert.match(finestra.richieste[0].messaggioErrore, /firmato o è stato modificato/);
+  assert.equal(chiave.firme, 1);
+  assert.deepEqual(await leggiCredenziali(percorso, chiave), nuove);
 });

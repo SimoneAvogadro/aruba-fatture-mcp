@@ -123,13 +123,14 @@ L'ambiente `demo` usa i server di test Aruba (`demoauth`/`demows`): consigliato 
 Su Windows, se `ARUBA_USERNAME` e `ARUBA_PASSWORD` **non** sono impostate, il server non le cerca nella configurazione:
 
 1. al primo uso di un tool si apre la finestra di Windows **Aruba Fatture MCP**, che chiede username e password del pannello Aruba;
-2. il server le verifica con un login reale al pannello, poi le salva cifrate in `%USERPROFILE%\.aruba-fatture-mcp\credenziali.json`;
-3. alle sessioni successive basta la conferma di **Windows Hello** (impronta, volto o PIN).
+2. il server le verifica con un login reale al pannello, poi le salva cifrate e firmate in `%USERPROFILE%\.aruba-fatture-mcp\credenziali.json`. Windows Hello chiede due conferme: una per creare la chiave e una per il salvataggio ("Conferma il salvataggio delle credenziali Aruba Fatture MCP");
+3. alle sessioni successive basta una conferma di **Windows Hello** (impronta, volto o PIN).
 
 Come funziona la protezione:
 
 - le credenziali sono cifrate con AES-256-GCM, e la chiave AES è cifrata con una chiave RSA di Windows Hello (Microsoft Passport Key Storage Provider) che resta nel TPM;
 - senza la tua conferma il file non è decifrabile, nemmeno da un altro programma che gira con il tuo utente;
+- il file è anche **firmato** con la stessa chiave Hello. Cifrare con la chiave pubblica non richiede conferma, quindi senza firma un programma malevolo potrebbe sostituire il file con credenziali di un altro account Aruba. Firmare richiede Windows Hello, e la firma si verifica prima di ogni sblocco: un file non firmato o modificato non viene usato, e il server richiede le credenziali;
 - in questa modalità i token di accesso Aruba restano solo in memoria e non vengono mai scritti su disco.
 
 Mentre Windows aspetta la conferma, un tool risponde dopo circa 45 secondi con "completa la finestra e riprova", per non superare il timeout di Claude Desktop: basta ripetere la richiesta. Se Aruba rifiuta la password (ad esempio perché è stata cambiata), alla richiesta successiva la finestra si riapre per reinserirla. Dopo 3 rifiuti nella stessa sessione il server si ferma, per non far bloccare l'account.

@@ -14,6 +14,7 @@
 import type { EsitoLogin } from "../panel-client.js";
 import {
   ChiaveHelloMancanteError,
+  FirmaNonValidaError,
   SbloccoAnnullatoError,
   SbloccoInCorsoError,
   TroppiTentativiError,
@@ -113,7 +114,12 @@ export class FornitoreHello implements FonteCredenziali {
           return salvate;
         }
       } catch (errore) {
-        if (!(errore instanceof ChiaveHelloMancanteError)) throw errore;
+        // Chiave sparita o file non firmato da noi: in entrambi i casi il file
+        // non è utilizzabile, e reinserire le credenziali lo sostituisce con
+        // uno valido. Il nuovo salvataggio richiede comunque Windows Hello.
+        if (!(errore instanceof ChiaveHelloMancanteError || errore instanceof FirmaNonValidaError)) {
+          throw errore;
+        }
         this.reinserimento = { messaggio: errore.message };
       }
     }

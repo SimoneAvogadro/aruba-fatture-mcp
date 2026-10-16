@@ -69,7 +69,10 @@ import { parseFatturaXml } from "./fatturapa.js";
 const modalita = scegliModalita(process.argv.slice(2), process.env, process.platform);
 const environment = scegliAmbiente(process.env, modalita.tipo === "hello") as ArubaEnvironment;
 
-const CONTESTO_HELLO = "Sblocca le credenziali Aruba Fatture MCP";
+const CONTESTI_HELLO = {
+  contesto: "Sblocca le credenziali Aruba Fatture MCP",
+  contestoFirma: "Conferma il salvataggio delle credenziali Aruba Fatture MCP",
+};
 const comandoReset = `node "${process.argv[1] ?? "dist\\index.js"}" ${COMANDO_RESET}`;
 
 if (modalita.tipo === "errore") {
@@ -84,7 +87,7 @@ if (modalita.tipo === "reset") {
   }
   try {
     const percorso = percorsoVault();
-    const esito = await cancellaVault(percorso, await creaChiaveHelloWindows({ contesto: CONTESTO_HELLO }));
+    const esito = await cancellaVault(percorso, await creaChiaveHelloWindows(CONTESTI_HELLO));
     if (!esito.fileRimosso && !esito.chiaveRimossa) {
       console.log("Nessuna credenziale Aruba salvata con Windows Hello.");
     } else {
@@ -116,7 +119,7 @@ const modalitaHello = modalita.tipo === "hello";
 function chiaveHelloAlPrimoUso(): ChiaveHello {
   let chiave: Promise<ChiaveHello> | null = null;
   const apri = () =>
-    (chiave ??= creaChiaveHelloWindows({ contesto: CONTESTO_HELLO }).catch((errore) => {
+    (chiave ??= creaChiaveHelloWindows(CONTESTI_HELLO).catch((errore) => {
       chiave = null;
       throw errore;
     }));
@@ -125,6 +128,8 @@ function chiaveHelloAlPrimoUso(): ChiaveHello {
     crea: async () => (await apri()).crea(),
     cifra: async (dati) => (await apri()).cifra(dati),
     decifra: async (dati) => (await apri()).decifra(dati),
+    firma: async (dati) => (await apri()).firma(dati),
+    verificaFirma: async (dati, firma) => (await apri()).verificaFirma(dati, firma),
     elimina: async () => (await apri()).elimina(),
   };
 }

@@ -206,6 +206,30 @@ l'applicazione non può escluderlo. È accettato.
 11. **Windows Hello non configurato sul PC:** messaggio d'errore che spiega come
     attivarlo (Impostazioni → Account → Opzioni di accesso).
 
+## Aggiunta: firma obbligatoria del file (2026-10-16)
+
+Chiesta dall'utente dopo la prima versione verificata (tag `hello-verificata`).
+
+- **Perché:** cifrare con la chiave pubblica non richiede conferma, quindi un
+  programma che gira con l'utente potrebbe sostituire il file con credenziali
+  di un altro account Aruba. Il server, dopo l'impronta, userebbe
+  quell'account.
+- **Salvataggio:** il file (formato 2) è firmato con la chiave Hello, SHA-256
+  e PKCS#1 v1.5, sui campi `versione`, `chiaveCifrata`, `iv`, `tag` e `dati`.
+  Firmare richiede Windows Hello, con il testo "Conferma il salvataggio delle
+  credenziali Aruba Fatture MCP", diverso da quello dello sblocco.
+- **Lettura:** la firma si verifica con la chiave pubblica, senza finestre,
+  prima di chiedere la conferma per decifrare.
+  - Un file non firmato, compreso il formato 1, o modificato non viene usato.
+  - Si richiedono le credenziali con il messaggio "non è firmato o è stato
+    modificato" e si salva un file nuovo firmato.
+- **Conferme Hello:**
+  - primo avvio: due (creazione della chiave e firma);
+  - password cambiata o file rifiutato: una (firma);
+  - avvio normale: una.
+- **Nessuna migrazione del formato 1:** accettarlo anche una sola volta
+  vanificherebbe la firma.
+
 ## Lasciato al builder
 
 - **Prova reale prima di tutto**, su questa macchina (Windows 11). Node per

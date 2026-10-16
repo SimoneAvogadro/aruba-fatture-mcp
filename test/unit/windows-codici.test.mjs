@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { erroreDecifratura, chiaveMancante } from "../../dist/credenziali/windows-native.js";
+import {
+  chiaveMancante,
+  erroreDecifratura,
+  erroreFirma,
+  esitoVerificaFirma,
+} from "../../dist/credenziali/windows-native.js";
 import {
   ChiaveHelloMancanteError,
   SbloccoAnnullatoError,
@@ -24,4 +29,19 @@ test("esiti della decifratura: successo, annullamento, chiave mancante, altro", 
   assert.ok(altro instanceof VaultIllegibileError);
   assert.match(altro.message, /--reset-windows-hello/);
   assert.match(altro.message, /0x80090005/);
+});
+
+test("verifica della firma: valida, non valida, chiave mancante, altro", () => {
+  assert.equal(esitoVerificaFirma(0), true);
+  // NTE_BAD_SIGNATURE
+  assert.equal(esitoVerificaFirma(0x80090006 | 0), false);
+  assert.throws(() => esitoVerificaFirma(0x8009000d | 0), ChiaveHelloMancanteError);
+  assert.throws(() => esitoVerificaFirma(0x80090027 | 0), /0x80090027/);
+});
+
+test("esiti della firma: successo, annullamento, chiave mancante, altro", () => {
+  assert.equal(erroreFirma(0), null);
+  assert.ok(erroreFirma(0x80090036 | 0) instanceof SbloccoAnnullatoError);
+  assert.ok(erroreFirma(0x80090016 | 0) instanceof ChiaveHelloMancanteError);
+  assert.match(erroreFirma(0x80090005 | 0).message, /firma.*0x80090005/);
 });
