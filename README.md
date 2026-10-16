@@ -92,20 +92,23 @@ La direzione (emessa/ricevuta) è determinata confrontando il cedente della fatt
 
 - Node.js ≥ 18
 - Credenziali del servizio Aruba Fatturazione Elettronica
+- Facoltativo, su Windows 10/11: Windows Hello configurato (impronta, volto o PIN), per non scrivere le credenziali in chiaro
 
 ## Installazione
 
 ```bash
-npm install
+npm ci
 npm run build
 ```
+
+`npm ci` installa esattamente le versioni bloccate in `package-lock.json`. Su Windows va eseguito da Windows (non da WSL), perché scarica i binari nativi di koffi per la piattaforma corrente.
 
 ## Configurazione
 
 | Variabile | Descrizione |
 |---|---|
-| `ARUBA_USERNAME` | Username del servizio Fatturazione Elettronica |
-| `ARUBA_PASSWORD` | Password del servizio |
+| `ARUBA_USERNAME` | Username del servizio Fatturazione Elettronica. Su Windows si può omettere: vedi [Windows Hello](#credenziali-protette-da-windows-hello-windows) |
+| `ARUBA_PASSWORD` | Password del servizio. Stesso discorso |
 | `ARUBA_ENVIRONMENT` | `demo` (default) oppure `production` |
 | `ARUBA_ARCHIVE_DIR` | Cartella con gli XML/ZIP delle fatture, usata dai tool di analisi quando non si passa `archivePath` |
 | `ARUBA_VAT_CODE` | Facoltativa: P.IVA del titolare, solo come fallback se `get_user_info` non è raggiungibile |
@@ -114,6 +117,34 @@ npm run build
 Le credenziali non vanno messe in file versionati: `.env` è già in `.gitignore`.
 
 L'ambiente `demo` usa i server di test Aruba (`demoauth`/`demows`): consigliato per le prime prove.
+
+### Credenziali protette da Windows Hello (Windows)
+
+Su Windows, se `ARUBA_USERNAME` e `ARUBA_PASSWORD` **non** sono impostate, il server non le cerca nella configurazione:
+
+1. al primo uso di un tool si apre la finestra di Windows **Aruba Fatture MCP**, che chiede username e password del pannello Aruba;
+2. il server le verifica con un login reale al pannello, poi le salva cifrate in `%USERPROFILE%\.aruba-fatture-mcp\credenziali.json`;
+3. alle sessioni successive basta la conferma di **Windows Hello** (impronta, volto o PIN).
+
+Come funziona la protezione:
+
+- le credenziali sono cifrate con AES-256-GCM, e la chiave AES è cifrata con una chiave RSA di Windows Hello (Microsoft Passport Key Storage Provider) che resta nel TPM;
+- senza la tua conferma il file non è decifrabile, nemmeno da un altro programma che gira con il tuo utente;
+- in questa modalità i token di accesso Aruba restano solo in memoria e non vengono mai scritti su disco.
+
+Mentre Windows aspetta la conferma, un tool risponde dopo circa 45 secondi con "completa la finestra e riprova", per non superare il timeout di Claude Desktop: basta ripetere la richiesta. Se Aruba rifiuta la password (ad esempio perché è stata cambiata), alla richiesta successiva la finestra si riapre per reinserirla. Dopo 3 rifiuti nella stessa sessione il server si ferma, per non far bloccare l'account.
+
+Per **cancellare** le credenziali salvate e la chiave Windows Hello, da un terminale Windows:
+
+```bat
+node <percorso-del-progetto>\dist\index.js --reset-windows-hello
+```
+
+Al prossimo uso da Claude Desktop verranno richieste di nuovo. Lo stesso vale se reimposti il PIN di Windows, che cancella le chiavi Hello: il server se ne accorge e richiede le credenziali.
+
+**Limite attuale:** se sull'account Aruba è attiva la verifica in due passaggi, le credenziali vengono salvate, ma i tool del pannello rispondono che la verifica in due passaggi non è ancora supportata.
+
+**Dipendenza nativa:** l'accesso a Windows Hello passa da [koffi](https://koffi.dev), una libreria FFI molto diffusa per Node.js, con un solo manutentore e binari precompilati per piattaforma. È fissata a una versione esatta e viene caricata solo su Windows in questa modalità.
 
 ### Collegare il server a un client MCP
 
@@ -131,7 +162,23 @@ claude mcp add aruba-fatture ^
 
 #### Claude Desktop
 
-In `claude_desktop_config.json` (o nel file MCP equivalente di Cursor/Cline/Zed):
+Su Windows, con le credenziali protette da Windows Hello (nessuna password nel file di configurazione):
+
+```json
+{
+  "mcpServers": {
+    "aruba-fatture": {
+      "command": "node",
+      "args": ["<percorso-del-progetto>\\dist\\index.js"],
+      "env": {
+        "ARUBA_ENVIRONMENT": "production"
+      }
+    }
+  }
+}
+```
+
+Con le credenziali nelle variabili d'ambiente, in `claude_desktop_config.json` (o nel file MCP equivalente di Cursor/Cline/Zed):
 
 ```json
 {
@@ -175,6 +222,11 @@ Il codice è organizzato per sorgente dati, in modo che i tre canali restino ind
 | `src/archivio.ts` | Lettura di un archivio locale di `.xml`/`.p7m`/`.zip`, con classificazione emesse/ricevute |
 | `src/fatturapa.ts` | Parser FatturaPA v1.2.x da XML a struttura tipizzata |
 | `src/analisi.ts` | Aggregazioni sull'archivio locale (liste, controparti, IVA per aliquota, andamento) |
+| `src/titolare.ts` | Partita IVA e codice fiscale del titolare, per classificare le fatture dell'archivio |
+| `src/credenziali/modalita.ts` | Scelta della fonte delle credenziali: variabili d'ambiente o Windows Hello |
+| `src/credenziali/fornitore-hello.ts` | Sblocco, primo inserimento e nuova richiesta delle credenziali in modalità Windows Hello |
+| `src/credenziali/vault.ts` | File cifrato delle credenziali |
+| `src/credenziali/windows-native.ts` | Chiamate a Windows (NCrypt/Windows Hello e finestra credenziali) tramite koffi |
 
 ### Come funziona la modalità pannello (live)
 
