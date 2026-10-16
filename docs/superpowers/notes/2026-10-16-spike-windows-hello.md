@@ -135,3 +135,26 @@ senza credenziali e con `ARUBA_ENVIRONMENT=production`.
   - account con 2FA (disattivata dall'utente);
   - Windows Hello non configurato;
   - Windows 10 (lo farà l'utente).
+
+## Firma del file (aggiunta)
+
+Esito delle prove del 2026-10-16 con Claude Desktop, utente al PC.
+
+- **Firma con il Passport KSP:** funziona.
+  - Usa `NCryptSignHash` con `BCRYPT_PKCS1_PADDING_INFO { "SHA256" }` e flag
+    0x2, in modo asincrono.
+  - Mostra Windows Hello con il testo `Use Context` impostato per il
+    salvataggio.
+- **`NCryptVerifySignature` NON è supportata dal Passport KSP:** risponde
+  `0x80090029` (NTE_NOT_SUPPORTED) sia con il padding info sia senza.
+  - `NCryptExportKey(..., "RSAPUBLICBLOB", ...)` invece funziona senza
+    conferma: 283 byte, magic `RSA1`, 2048 bit.
+  - La firma si verifica in Node (`crypto.verify("sha256", ...)`) con la
+    chiave pubblica ricavata dal blob.
+- **Prove con Claude Desktop:**
+  - file del formato 1: finestra credenziali con il messaggio "non è firmato o
+    è stato modificato", una conferma Hello (firma), file del formato 2 salvato;
+  - riavvio: una sola conferma Hello (sblocco);
+  - file manomesso (un byte di `dati`): nessuna richiesta di sblocco, finestra
+    credenziali con il messaggio, conferma Hello per il salvataggio, file
+    firmato nuovo; poi tutto funziona.
