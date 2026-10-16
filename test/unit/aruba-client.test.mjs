@@ -115,3 +115,15 @@ test("un refresh fallito non è un rifiuto della password", async () => {
   assert.deepEqual(grants, ["password", "refresh_token", "password"]);
   assert.deepEqual(fonte.rifiuti, []);
 });
+
+test("in ambiente demo un rifiuto non viene segnalato: le credenziali del pannello sono di produzione", async () => {
+  await tmpIsolata();
+  simulaAruba(() => new Response('{"error":"invalid_grant"}', { status: 401 }));
+  const fonte = fonteFinta();
+  await assert.rejects(new ArubaClient(fonte, "demo", { persistiToken: false }).userInfo(), (e) => {
+    assert.ok(e instanceof ArubaApiError);
+    assert.equal(e.message.includes("Alla prossima richiesta"), false);
+    return true;
+  });
+  assert.deepEqual(fonte.rifiuti, []);
+});

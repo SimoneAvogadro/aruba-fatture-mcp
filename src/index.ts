@@ -32,7 +32,7 @@ import {
 } from "./analisi.js";
 import { ArubaPanelClient, PanelError, verificaLoginPannello } from "./panel-client.js";
 import { FornitoreHello } from "./credenziali/fornitore-hello.js";
-import { scegliModalita } from "./credenziali/modalita.js";
+import { scegliAmbiente, scegliModalita } from "./credenziali/modalita.js";
 import {
   COMANDO_RESET,
   FonteStatica,
@@ -67,7 +67,7 @@ import { parseFatturaXml } from "./fatturapa.js";
 // ---------------------------------------------------------------------------
 
 const modalita = scegliModalita(process.argv.slice(2), process.env, process.platform);
-const environment = (process.env.ARUBA_ENVIRONMENT ?? "demo") as ArubaEnvironment;
+const environment = scegliAmbiente(process.env, modalita.tipo === "hello") as ArubaEnvironment;
 
 const CONTESTO_HELLO = "Sblocca le credenziali Aruba Fatture MCP";
 const comandoReset = `node "${process.argv[1] ?? "dist\\index.js"}" ${COMANDO_RESET}`;

@@ -75,3 +75,16 @@ test("i messaggi degli errori di sblocco citano il comando di reset", () => {
   }
   assert.match(new HelloNonDisponibileError().message, /Opzioni di accesso/);
 });
+
+import { scegliAmbiente } from "../../dist/credenziali/modalita.js";
+
+test("in modalità Hello senza ARUBA_ENVIRONMENT l'ambiente è production", () => {
+  assert.equal(scegliAmbiente({}, true), "production");
+  assert.equal(scegliAmbiente({ ARUBA_ENVIRONMENT: "" }, true), "production");
+});
+
+test("ARUBA_ENVIRONMENT esplicito vince; senza Hello il predefinito resta demo", () => {
+  assert.equal(scegliAmbiente({ ARUBA_ENVIRONMENT: "demo" }, true), "demo");
+  assert.equal(scegliAmbiente({}, false), "demo");
+  assert.equal(scegliAmbiente({ ARUBA_ENVIRONMENT: "production" }, false), "production");
+});

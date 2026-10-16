@@ -122,7 +122,12 @@ export class ArubaClient {
       const text = await res.text();
       // 400/401 al login con password è l'unico caso che dice qualcosa sulla
       // password: rate limit ed errori del server non devono farla richiedere.
-      const rifiutata = cred !== undefined && (res.status === 400 || res.status === 401);
+      // In demo le credenziali (quelle del pannello, di produzione) non sono
+      // valide per definizione: un rifiuto non dice nulla sulla password.
+      const rifiutata =
+        cred !== undefined &&
+        this.environment === "production" &&
+        (res.status === 400 || res.status === 401);
       if (rifiutata) this.fonte.segnalaRifiuto(cred);
       const hint =
         res.status === 429

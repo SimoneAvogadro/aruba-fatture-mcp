@@ -42,3 +42,15 @@ export function scegliModalita(
     messaggio: "Errore: impostare le variabili d'ambiente ARUBA_USERNAME e ARUBA_PASSWORD.",
   };
 }
+
+/**
+ * In modalità Windows Hello le credenziali sono quelle del pannello web, cioè
+ * di produzione: con il predefinito storico "demo" i server di prova le
+ * rifiuterebbero. Un valore esplicito vince sempre.
+ */
+export function scegliAmbiente(
+  env: Record<string, string | undefined>,
+  modalitaHello: boolean,
+): string {
+  return env.ARUBA_ENVIRONMENT || (modalitaHello ? "production" : "demo");
+}

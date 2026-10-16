@@ -109,7 +109,7 @@ npm run build
 |---|---|
 | `ARUBA_USERNAME` | Username del servizio Fatturazione Elettronica. Su Windows si può omettere: vedi [Windows Hello](#credenziali-protette-da-windows-hello-windows) |
 | `ARUBA_PASSWORD` | Password del servizio. Stesso discorso |
-| `ARUBA_ENVIRONMENT` | `demo` (default) oppure `production` |
+| `ARUBA_ENVIRONMENT` | `demo` (default) oppure `production`. In modalità Windows Hello il predefinito è `production`, perché le credenziali sono quelle del pannello web |
 | `ARUBA_ARCHIVE_DIR` | Cartella con gli XML/ZIP delle fatture, usata dai tool di analisi quando non si passa `archivePath` |
 | `ARUBA_VAT_CODE` | Facoltativa: P.IVA del titolare, solo come fallback se `get_user_info` non è raggiungibile |
 | `ARUBA_FISCAL_CODE` | Facoltativa: codice fiscale del titolare, stesso scopo |

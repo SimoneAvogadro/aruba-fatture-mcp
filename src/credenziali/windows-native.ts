@@ -13,6 +13,7 @@ import {
   ChiaveHelloMancanteError,
   HelloNonDisponibileError,
   SbloccoAnnullatoError,
+  VaultIllegibileError,
   type Credenziali,
 } from "./tipi.js";
 import type { ChiaveHello } from "./vault.js";
@@ -24,6 +25,8 @@ const PROVIDER_PASSPORT = "Microsoft Passport Key Storage Provider";
 const NOME_CHIAVE = "aruba-fatture-mcp/credenziali/v1";
 
 const NTE_NO_KEY = 0x8009000d;
+const NTE_NOT_FOUND = 0x80090011;
+const NTE_BAD_KEYSET = 0x80090016;
 const NTE_EXISTS = 0x8009000f;
 const NTE_USER_CANCELLED = 0x80090036;
 const SCARD_W_CANCELLED_BY_USER = 0x8010006e;
@@ -47,6 +50,26 @@ function asincrona<T>(fn: Funzione, ...args: unknown[]): Promise<T> {
 const esadecimale = (hr: number) => "0x" + (hr >>> 0).toString(16).padStart(8, "0");
 const annullato = (hr: number) =>
   hr >>> 0 === NTE_USER_CANCELLED || hr >>> 0 === SCARD_W_CANCELLED_BY_USER;
+
+/**
+ * La prova ha mostrato NTE_NO_KEY dopo l'eliminazione della chiave; dopo una
+ * reimpostazione del PIN di Windows il contenitore Hello viene ricreato e può
+ * rispondere anche con gli altri due codici.
+ */
+export function chiaveMancante(hr: number): boolean {
+  const codice = hr >>> 0;
+  return codice === NTE_NO_KEY || codice === NTE_NOT_FOUND || codice === NTE_BAD_KEYSET;
+}
+
+/** null se la decifratura è riuscita, altrimenti l'errore da mostrare. */
+export function erroreDecifratura(hr: number): Error | null {
+  if (hr === 0) return null;
+  if (annullato(hr)) return new SbloccoAnnullatoError();
+  if (chiaveMancante(hr)) return new ChiaveHelloMancanteError();
+  // Ad esempio un vault cifrato con una chiave diversa da quella attuale:
+  // senza reset non se ne esce, quindi va indicato come farlo.
+  return new VaultIllegibileError(`decifratura non riuscita ${esadecimale(hr)}`);
+}
 
 interface Binding {
   koffi: Koffi;
@@ -176,7 +199,7 @@ class ChiaveHelloWindows implements ChiaveHello {
   private apri(): number | null {
     const chiave = [0];
     const hr = this.b.NCryptOpenKey(this.provider, chiave, this.nome, 0, 0);
-    if (hr >>> 0 === NTE_NO_KEY) return null;
+    if (chiaveMancante(hr)) return null;
     if (hr !== 0) throw new HelloNonDisponibileError(`apertura chiave ${esadecimale(hr)}`);
     return chiave[0];
   }
@@ -246,9 +269,8 @@ class ChiaveHelloWindows implements ChiaveHello {
         this.b.NCryptDecrypt,
         chiave, dati, dati.length, null, uscita, uscita.length, n, NCRYPT_PAD_PKCS1_FLAG,
       );
-      if (annullato(hr)) throw new SbloccoAnnullatoError();
-      if (hr >>> 0 === NTE_NO_KEY) throw new ChiaveHelloMancanteError();
-      if (hr !== 0) throw new Error(`Windows Hello: decifratura non riuscita (${esadecimale(hr)}).`);
+      const errore = erroreDecifratura(hr);
+      if (errore) throw errore;
       return Buffer.from(uscita.subarray(0, n[0]));
     } finally {
       uscita.fill(0);
