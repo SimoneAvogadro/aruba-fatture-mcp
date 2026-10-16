@@ -9,7 +9,7 @@
  * docs/superpowers/notes/2026-10-16-spike-windows-hello.md.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import {
   ChiaveHelloMancanteError,
   HelloNonDisponibileError,
@@ -28,7 +28,6 @@ const NOME_CHIAVE = "aruba-fatture-mcp/credenziali/v1";
 const NTE_NO_KEY = 0x8009000d;
 const NTE_NOT_FOUND = 0x80090011;
 const NTE_BAD_KEYSET = 0x80090016;
-const NTE_BAD_SIGNATURE = 0x80090006;
 const NTE_EXISTS = 0x8009000f;
 const NTE_USER_CANCELLED = 0x80090036;
 const SCARD_W_CANCELLED_BY_USER = 0x8010006e;
@@ -63,12 +62,32 @@ export function chiaveMancante(hr: number): boolean {
   return codice === NTE_NO_KEY || codice === NTE_NOT_FOUND || codice === NTE_BAD_KEYSET;
 }
 
-/** true/false per firma valida o no; lancia per gli errori che non dicono nulla sulla firma. */
-export function esitoVerificaFirma(hr: number): boolean {
-  if (hr === 0) return true;
-  if (hr >>> 0 === NTE_BAD_SIGNATURE) return false;
-  if (chiaveMancante(hr)) throw new ChiaveHelloMancanteError();
-  throw new Error(`Windows Hello: verifica della firma non riuscita (${esadecimale(hr)}).`);
+/**
+ * Verifica una firma RSA SHA-256 PKCS#1 v1.5 con la chiave pubblica esportata
+ * da Windows come BCRYPT_RSAPUBLIC_BLOB. Il Passport KSP non supporta
+ * NCryptVerifySignature (risponde 0x80090029), ma esporta la chiave pubblica
+ * senza chiedere conferma.
+ */
+export function verificaFirmaConBlob(blob: Buffer, dati: Buffer, firma: Buffer): boolean {
+  // Intestazione: Magic "RSA1", BitLength, cbPublicExp, cbModulus, cbPrime1,
+  // cbPrime2; seguono esponente e modulo big-endian.
+  const lunghezzaEsponente = blob.length >= 24 ? blob.readUInt32LE(8) : 0;
+  const lunghezzaModulo = blob.length >= 24 ? blob.readUInt32LE(12) : 0;
+  if (
+    blob.subarray(0, 4).toString("ascii") !== "RSA1" ||
+    lunghezzaEsponente === 0 ||
+    lunghezzaModulo === 0 ||
+    blob.length < 24 + lunghezzaEsponente + lunghezzaModulo
+  ) {
+    throw new Error("Windows Hello: la chiave esportata non è una chiave pubblica RSA.");
+  }
+  const e = blob.subarray(24, 24 + lunghezzaEsponente);
+  const n = blob.subarray(24 + lunghezzaEsponente, 24 + lunghezzaEsponente + lunghezzaModulo);
+  const chiave = createPublicKey({
+    key: { kty: "RSA", n: n.toString("base64url"), e: e.toString("base64url") },
+    format: "jwk",
+  });
+  return verify("sha256", dati, chiave, firma);
 }
 
 /** null se la firma è riuscita, altrimenti l'errore da mostrare. */
@@ -99,7 +118,7 @@ interface Binding {
   NCryptEncrypt: Funzione;
   NCryptDecrypt: Funzione;
   NCryptSignHash: Funzione;
-  NCryptVerifySignature: Funzione;
+  NCryptExportKey: Funzione;
   NCryptDeleteKey: Funzione;
   NCryptFreeObject: Funzione;
   OpenProcessToken: Funzione;
@@ -159,7 +178,7 @@ function caricaBinding(): Promise<Binding> {
       NCryptEncrypt: f(ncrypt, `${crypt} NCryptEncrypt(uintptr_t hKey, const uint8_t *in, uint32_t cbIn, void *pad, _Out_ uint8_t *out, uint32_t cbOut, _Out_ uint32_t *pcb, uint32_t flags)`),
       NCryptDecrypt: f(ncrypt, `${crypt} NCryptDecrypt(uintptr_t hKey, const uint8_t *in, uint32_t cbIn, void *pad, _Out_ uint8_t *out, uint32_t cbOut, _Out_ uint32_t *pcb, uint32_t flags)`),
       NCryptSignHash: f(ncrypt, `${crypt} NCryptSignHash(uintptr_t hKey, BCRYPT_PKCS1_PADDING_INFO *pad, const uint8_t *hash, uint32_t cbHash, _Out_ uint8_t *sig, uint32_t cbSig, _Out_ uint32_t *pcb, uint32_t flags)`),
-      NCryptVerifySignature: f(ncrypt, `${crypt} NCryptVerifySignature(uintptr_t hKey, BCRYPT_PKCS1_PADDING_INFO *pad, const uint8_t *hash, uint32_t cbHash, const uint8_t *sig, uint32_t cbSig, uint32_t flags)`),
+      NCryptExportKey: f(ncrypt, `${crypt} NCryptExportKey(uintptr_t hKey, uintptr_t hExportKey, const char16_t *type, void *params, _Out_ uint8_t *out, uint32_t cbOut, _Out_ uint32_t *pcb, uint32_t flags)`),
       NCryptDeleteKey: f(ncrypt, `${crypt} NCryptDeleteKey(uintptr_t hKey, uint32_t flags)`),
       NCryptFreeObject: f(ncrypt, `${crypt} NCryptFreeObject(uintptr_t h)`),
       OpenProcessToken: f(advapi, "bool __stdcall OpenProcessToken(uintptr_t proc, uint32_t access, _Out_ uintptr_t *tok)"),
@@ -327,11 +346,12 @@ class ChiaveHelloWindows implements ChiaveHello {
     const chiave = this.apri();
     if (chiave === null) throw new ChiaveHelloMancanteError();
     try {
-      const hash = createHash("sha256").update(dati).digest();
-      const hr = this.b.NCryptVerifySignature(
-        chiave, { pszAlgId: "SHA256" }, hash, hash.length, firma, firma.length, NCRYPT_PAD_PKCS1_FLAG,
-      );
-      return esitoVerificaFirma(hr);
+      const blob = Buffer.alloc(1024);
+      const n = [0];
+      const hr = this.b.NCryptExportKey(chiave, 0, "RSAPUBLICBLOB", null, blob, blob.length, n, 0);
+      if (chiaveMancante(hr)) throw new ChiaveHelloMancanteError();
+      if (hr !== 0) throw new Error(`Windows Hello: esportazione della chiave pubblica non riuscita (${esadecimale(hr)}).`);
+      return verificaFirmaConBlob(blob.subarray(0, n[0]), dati, firma);
     } finally {
       this.b.NCryptFreeObject(chiave);
     }
