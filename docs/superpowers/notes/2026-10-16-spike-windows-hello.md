@@ -81,3 +81,20 @@ ncrypt.func("int32_t __stdcall NCryptFreeObject(uintptr_t h)");
 - **Account Aruba:** l'utente ha disattivato la 2FA il 2026-10-16, quindi la
   pagina OTP del pannello non è più osservabile sull'account reale. Il suo
   riconoscimento resta coperto dalle fixture del Task 4.
+
+## Prova manuale del Task 7 (moduli compilati, copia Windows)
+
+Eseguita il 2026-10-16 con l'utente al PC, da terminale, con lo script
+`prova-task7.mjs` (fuori dal repository).
+
+- **`chiediCredenzialiWindows`:** username suggerito `mario.rossi` restituito
+  intatto, password `pà$$ wörd €` restituita identica (11 caratteri).
+- **`creaChiaveHelloWindows`:**
+  - `esiste()` false, poi `crea()` con conferma Hello, poi `esiste()` true;
+  - `cifra` dà 256 byte senza finestre;
+  - `decifra` con conferma restituisce i byte identici;
+  - `crea()` su una chiave esistente non dà errore;
+  - `decifra` annullata dà `SbloccoAnnullatoError`.
+- **Eliminazione:** `elimina()` true, poi `decifra` dà
+  `ChiaveHelloMancanteError`, poi `elimina()` false.
+- **Primo piano delle finestre con Claude Desktop:** da verificare nel Task 9.
