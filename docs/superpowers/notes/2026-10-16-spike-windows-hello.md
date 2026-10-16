@@ -98,3 +98,40 @@ Eseguita il 2026-10-16 con l'utente al PC, da terminale, con lo script
 - **Eliminazione:** `elimina()` true, poi `decifra` dà
   `ChiaveHelloMancanteError`, poi `elimina()` false.
 - **Primo piano delle finestre con Claude Desktop:** da verificare nel Task 9.
+
+## Prova completa con Claude Desktop (Task 9)
+
+Eseguita il 2026-10-16 su Windows 11. Claude Desktop è un pacchetto MSIX dello
+Store, la copia di prova è `C:\Users\Simone\aruba-fatture-mcp-dev`, configurata
+senza credenziali e con `ARUBA_ENVIRONMENT=production`.
+
+- **Primo inserimento:** la finestra credenziali compare **davanti** a Claude
+  Desktop.
+  - Una password sbagliata fa riaprire la finestra con il messaggio d'errore e lo
+    username già compilato.
+  - Con la password corretta compare Windows Hello (creazione della chiave), poi
+    le fatture vengono elencate.
+- **Riavvio di Claude Desktop:** compare solo Windows Hello; tutto funziona.
+- **Annullamento di Hello:** il tool lo segnala; alla richiesta successiva Hello
+  ricompare e, confermato, il tool prosegue.
+- **Conferma lenta (oltre 45 s):** il tool risponde di completare la finestra e
+  riprovare; dopo la conferma la richiesta ripetuta prosegue.
+- **Vault e chiave tra contesti diversi:**
+  - il vault è in `C:\Users\Simone\.aruba-fatture-mcp\credenziali.json`, non
+    reindirizzato nella cartella del pacchetto;
+  - la chiave creata dal processo avviato da Claude Desktop è visibile anche al
+    terminale (il reset senza credenziali risponde correttamente).
+- **Nessun segreto in chiaro:**
+  - nessun file `aruba-fatture-mcp-token-*` in `%TEMP%`;
+  - nessuna occorrenza di token o password in `%USERPROFILE%\.aruba-fatture-mcp`,
+    `%LOCALAPPDATA%\Claude` e `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc`;
+  - le 61 corrispondenze in `%TEMP%` sono file temporanei di Office, precedenti e
+    non legati ad Aruba;
+  - il log MCP contiene solo le righe di avvio.
+- **Modalità variabili d'ambiente su Windows:** invariata (avvio senza riga
+  Hello).
+- **Non eseguito:**
+  - reset con credenziali vere (lasciato all'utente);
+  - account con 2FA (disattivata dall'utente);
+  - Windows Hello non configurato;
+  - Windows 10 (lo farà l'utente).
