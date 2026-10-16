@@ -170,7 +170,13 @@ l'applicazione non può escluderlo. È accettato.
    - Massimo 3 tentativi di login con password per avvio, contando insieme
      pannello e API, poi errore.
    - Un unico "fornitore di credenziali" condiviso dai due client gestisce
-     richiesta, verifica e nuovo salvataggio, con una nuova conferma Hello.
+     richiesta, verifica e nuovo salvataggio. Il nuovo salvataggio cifra con la
+     chiave pubblica e non richiede una seconda conferma Hello: non
+     proteggerebbe nulla, perché chiunque possa scrivere il file potrebbe già
+     sostituirlo.
+   - Se la chiave Hello non esiste più (ad esempio dopo aver reimpostato il PIN
+     di Windows, che cancella le chiavi Hello), il server lo dice e richiede le
+     credenziali come al primo avvio, invece di fermarsi.
 5. **Dove compare l'informazione su `--reset-windows-hello`:** Claude Desktop non
    mostra all'utente l'output del server, quindi l'informazione va nel testo
    della finestra di inserimento credenziali e nei messaggi d'errore dei tool
