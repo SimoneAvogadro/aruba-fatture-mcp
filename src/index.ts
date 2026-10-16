@@ -50,6 +50,7 @@ import {
   filtra as filtraPannello,
   normalizzaInviata,
   normalizzaRicevuta,
+  parametriPdfPannello,
   totali as totaliPannello,
   type FatturaPannello,
   type FiltriPannello,
@@ -854,7 +855,10 @@ server.registerTool(
         salvataggi.xml = target;
       }
       if (salvaPdfIn) {
-        const filePdf = await panelClient.service<ContenutoFile>(ep.pdf, { Id: id });
+        const filePdf = await panelClient.service<ContenutoFile>(
+          ep.pdf,
+          parametriPdfPannello(record, anno),
+        );
         if (filePdf.Content) {
           const target = resolve(salvaPdfIn);
           await mkdir(dirname(target), { recursive: true });
