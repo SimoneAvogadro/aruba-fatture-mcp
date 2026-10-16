@@ -67,7 +67,8 @@ if (environment !== "demo" && environment !== "production") {
   process.exit(1);
 }
 
-const client = new ArubaClient(username, password, environment);
+const fonte = new FonteStatica({ username, password });
+const client = new ArubaClient(fonte, environment, { persistiToken: true });
 
 // ---------------------------------------------------------------------------
 // Utilità
@@ -502,7 +503,7 @@ server.registerTool(
 // Pannello Aruba (API privata del pannello web)
 // ---------------------------------------------------------------------------
 
-const panelClient = new ArubaPanelClient(new FonteStatica({ username, password }));
+const panelClient = new ArubaPanelClient(fonte);
 
 const ENDPOINT_RICERCA = {
   inviate: "FatturaFrontEnd/advancedSearch",
