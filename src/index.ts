@@ -27,6 +27,7 @@ import {
   type Filtri,
 } from "./analisi.js";
 import { ArubaPanelClient, PanelError } from "./panel-client.js";
+import { FonteStatica } from "./credenziali/tipi.js";
 import {
   andamento as andamentoPannello,
   controparti as contropartiPannello,
@@ -501,7 +502,7 @@ server.registerTool(
 // Pannello Aruba (API privata del pannello web)
 // ---------------------------------------------------------------------------
 
-const panelClient = new ArubaPanelClient(username, password);
+const panelClient = new ArubaPanelClient(new FonteStatica({ username, password }));
 
 const ENDPOINT_RICERCA = {
   inviate: "FatturaFrontEnd/advancedSearch",
